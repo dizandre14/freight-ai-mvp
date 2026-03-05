@@ -1,0 +1,100 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AI Freight Audit Agent | MVP</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+<div id="passwordModal" class="modal-overlay" style="background: #003366; z-index: 9999;">
+    <div class="modal">
+        <h2 style="color: #003366;">Private MVP Access</h2>
+        <p>Please enter the access code to view this demo.</p>
+        <input type="password" id="sitePassword" placeholder="Enter password..." style="width: 80%; padding: 12px; margin-bottom: 10px; border: 1px solid #ccc; border-radius: 4px; font-size: 16px;">
+        <p id="passwordError" style="color: red; display: none; font-size: 13px; margin-top: 0;">Incorrect password.</p>
+        <button onclick="checkPassword()" style="width: 85%; padding:12px; background: #cc0000; color: white; border: none; border-radius: 5px; cursor: pointer; font-weight: bold;">Enter Site</button>
+    </div>
+</div>
+
+<div id="welcomeModal" class="modal-overlay" style="display: none;">
+    <div class="modal">
+        <h2 style="color: #003366;">Welcome to the MVP Test</h2>
+        <p>This is a <strong>bare-bones, MVP test demo,</strong> of the Freight Audit Agent logic.</p>
+        <p>It's only meant to show the functionality of the core product and nothing else.</p>
+        <button onclick="closeModal()" style="padding:10px 20px; background: #003366; color: white; border: none; border-radius: 5px; cursor: pointer;">Begin Testing</button>
+    </div>
+</div>
+
+<div id="alertModal" class="modal-overlay" style="display:none; background: rgba(0, 0, 0, 0.6);">
+    <div class="modal" style="text-align: left; border-top: 6px solid #cc0000;">
+        <h2 style="color: #cc0000; margin-top: 0;">⚠️ Audit Discrepancy</h2>
+        <p style="font-weight: bold; margin-bottom: 10px;">The following issues require manual review:</p>
+        <ul id="alertMessageList" style="color: #333; margin-bottom: 20px; padding-left: 20px; line-height: 1.6;"></ul>
+        <button onclick="closeAlert()" style="width: 100%; padding: 12px; background: #cc0000; color: white; border: none; border-radius: 6px; cursor: pointer; font-weight: bold;">Review Findings</button>
+    </div>
+</div>
+
+<div id="errorModal" class="modal-overlay" style="display:none; background: rgba(0, 0, 0, 0.7); z-index: 9000;">
+    <div class="modal" style="text-align: left; border-top: 6px solid #ff9900;">
+        <h2 style="color: #ff9900; margin-top: 0;">⚠️ Processing Error</h2>
+        <p id="errorMessageText" style="font-weight: bold; color: #333;"></p>
+        
+        <div style="background: #f8f9fa; padding: 15px; border-radius: 6px; margin-bottom: 20px; font-size: 13px; color: #555; border: 1px solid #eee;">
+            <p style="margin-top: 0; font-weight: bold; color: #003366;">AI Document Guidelines:</p>
+            <ul style="padding-left: 20px; margin-bottom: 0;">
+                <li><strong>File Size:</strong> Ensure PDFs are under 10 pages.</li>
+                <li><strong>Clarity:</strong> If using text or CSV, ensure column headers (Rate, Weight, Total) are clearly labeled.</li>
+                <li><strong>Relevance:</strong> Do not upload marketing materials or blank pages.</li>
+            </ul>
+        </div>
+        <button onclick="document.getElementById('errorModal').style.display='none'" style="width: 100%; padding: 12px; background: #555; color: white; border: none; border-radius: 6px; cursor: pointer; font-weight: bold;">Close & Try Again</button>
+    </div>
+</div>
+
+<div class="disclaimer-bar">⚠️ MVP TEST DEMO</div>
+
+<div class="container">
+    <h1>AI Freight Audit Agent</h1>
+    <p class="subtitle">Automated Document Recovery & Matching</p>
+
+    <form id="auditForm">
+        <div class="upload-zone" onclick="document.getElementById('fileInput').click()">
+            <h3>Drop Files Here</h3>
+            <p>Select Rate Con, BOL, and/or Invoice</p>
+            <input type="file" id="fileInput" multiple accept=".pdf, .csv, .txt" style="display:none;" onchange="updateFileCount()">
+            <div id="fileList" style="margin-top: 15px; font-size: 13px; text-align: left; display: inline-block;"></div>
+            <p id="fileCount" style="font-weight:bold; color:#003366;"></p>
+        </div>
+        <button type="submit" id="submitBtn" style="width:100%; padding:15px; background:#003366; color:white; border:none; border-radius:8px; font-weight:bold; cursor:pointer;">Analyze Load</button>
+    </form>
+
+    <div id="loadingBox" style="display:none; margin-top: 25px; padding: 25px; background: white; border-radius: 8px; border: 1px solid #e0e0e0; box-shadow: 0 4px 6px rgba(0,0,0,0.02);">
+        <p style="color: #003366; font-weight: bold; margin-top: 0; margin-bottom: 12px; text-align: center;">🧠 AI Document Vision Active...</p>
+        <div style="width: 100%; background: #eee; border-radius: 6px; overflow: hidden; height: 12px;">
+            <div id="progressBar" style="width: 0%; height: 100%; background: #003366; transition: width 0.6s ease-out;"></div>
+        </div>
+        <div style="display: flex; justify-content: space-between; margin-top: 10px; font-size: 12px; color: #666;">
+            <span id="loadingStatusText">Extracting text...</span>
+            <span>Est: ~8 seconds</span>
+        </div>
+    </div>
+
+    <div id="results" style="display:none; margin-top:30px;">
+        <div id="statusBox" style="padding:20px; border-radius:8px; text-align:center; font-weight:bold; margin-bottom:20px;"></div>
+        <div class="table-container">
+            <table>
+                <thead>
+                    <tr><th>Document</th><th>Amount</th><th>Weight</th></tr>
+                </thead>
+                <tbody id="dataTableBody"></tbody>
+            </table>
+        </div>
+        <p style="margin-top:20px;"><strong>Notes:</strong> <span id="reportNotes" style="color:red;"></span></p>
+    </div>
+</div>
+
+<script src="script.js"></script>
+</body>
+</html>

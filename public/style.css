@@ -1,0 +1,124 @@
+:root {
+    --primary: #003366;
+    --accent: #cc0000;
+    --bg: #f4f7f6;
+    --white: #ffffff;
+    --success: #d4edda;
+    --error: #f8d7da;
+}
+
+body {
+    font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+    background-color: var(--bg);
+    color: #333;
+    margin: 0;
+    padding: 0;
+    line-height: 1.6;
+}
+
+/* Disclaimer Bar */
+.disclaimer-bar {
+    background: #ffcc00;
+    color: #000;
+    text-align: center;
+    padding: 12px;
+    font-weight: bold;
+    font-size: 13px;
+    border-bottom: 2px solid #e6b800;
+}
+
+.container {
+    width: 90%;
+    max-width: 900px;
+    margin: 20px auto;
+    background: var(--white);
+    padding: 20px;
+    border-radius: 12px;
+    box-shadow: 0 10px 25px rgba(0,0,0,0.05);
+}
+
+h1 {
+    color: var(--primary);
+    text-align: center;
+    margin-bottom: 5px;
+    font-size: clamp(22px, 5vw, 32px);
+}
+
+p.subtitle {
+    text-align: center;
+    color: #666;
+    margin-bottom: 30px;
+    font-size: 14px;
+}
+
+/* Upload Zone */
+.upload-zone {
+    border: 2px dashed var(--primary);
+    padding: 30px;
+    text-align: center;
+    border-radius: 10px;
+    background: #f8fbff;
+    cursor: pointer;
+    transition: 0.3s;
+    margin-bottom: 20px;
+}
+
+.upload-zone:hover {
+    background: #eef5ff;
+}
+
+/* Responsive Table container */
+.table-container {
+    width: 100%;
+    overflow-x: auto;
+    margin-top: 15px;
+}
+
+table {
+    width: 100%;
+    border-collapse: collapse;
+    min-width: 450px;
+}
+
+th, td {
+    padding: 14px;
+    text-align: left;
+    border-bottom: 1px solid #eee;
+}
+
+/* Modal Pop-up */
+.modal-overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: rgba(0,0,0,0.8);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 1000;
+    transition: 0.3s;
+}
+
+.modal {
+    background: white;
+    width: 85%;
+    max-width: 450px;
+    padding: 30px;
+    border-radius: 15px;
+    text-align: center;
+}
+
+/* Mobile Adjustments */
+@media (max-width: 600px) {
+    .container {
+        padding: 20px;
+        width: 95%;
+    }
+    
+    th, td {
+        padding: 10px;
+        font-size: 13px;
+    }
+}
