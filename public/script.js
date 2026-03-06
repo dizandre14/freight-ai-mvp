@@ -1,13 +1,35 @@
-// --- SECURITY SETTINGS ---
-const SITE_PASSWORD = "audit"; // Change this to whatever you want!
+// --- GLOBAL VARIABLES & SECURITY ---
+const SITE_PASSWORD = "audit"; 
+let currentPdfBase64 = null; 
+let availableTokens = null; // NEW: Tracks tokens locally to prevent order-of-execution bugs
 
-// Run this the second the page loads
-window.onload = () => {
+// --- INITIALIZATION (Runs on page load) ---
+window.onload = async () => {
+    // 1. Fetch live token count from the server
+    try {
+        const statusRes = await fetch('/api/status');
+        const statusData = await statusRes.json();
+        availableTokens = statusData.tokens; // Store in global variable
+        document.getElementById('tokenCount').innerText = availableTokens;
+    } catch (err) {
+        document.getElementById('tokenCount').innerText = "Error";
+    }
+
+    // 2. Check for Stripe Payment Success
+    const urlParams = new URLSearchParams(window.location.search);
+    if (urlParams.get('payment') === 'success') {
+        alert("Payment successful! Your audits have been reloaded.");
+        window.history.replaceState({}, document.title, window.location.pathname); 
+        availableTokens = 10;
+        document.getElementById('tokenCount').innerText = "10";
+    }
+
+    // 3. Check Password State
     if (localStorage.getItem('freight_mvp_unlocked') === 'true') {
-        document.getElementById('passwordModal').style.display = 'none';
-        document.getElementById('welcomeModal').style.display = 'flex'; // Show welcome instead
+        document.getElementById('passwordModal')?.style.setProperty('display', 'none');
+        document.getElementById('welcomeModal')?.style.setProperty('display', 'flex');
     } else {
-        document.getElementById('passwordModal').style.display = 'flex';
+        document.getElementById('passwordModal')?.style.setProperty('display', 'flex');
     }
 };
 
@@ -22,11 +44,11 @@ function checkPassword() {
     }
 }
 
-// MODAL CONTROLS
+// --- MODAL CONTROLS ---
 function closeModal() { document.getElementById('welcomeModal').style.display = 'none'; }
 function closeAlert() { document.getElementById('alertModal').style.display = 'none'; }
 
-// UPDATE FILE UI
+// --- FILE UI UPDATES ---
 function updateFileCount() {
     const input = document.getElementById('fileInput');
     const fileList = document.getElementById('fileList');
@@ -44,19 +66,24 @@ function updateFileCount() {
     }
 }
 
-// MAIN SUBMIT FUNCTION
+// --- MAIN AUDIT SUBMISSION ---
 document.getElementById('auditForm').addEventListener('submit', async (e) => {
     e.preventDefault();
+    
+    // 🛑 NEW: Check tokens BEFORE checking file counts or extensions
+    if (availableTokens === 0) {
+        document.getElementById('paywallModal').style.display = 'flex';
+        return; // Halt immediately. Do not show file alerts.
+    }
+
     const fileInput = document.getElementById('fileInput');
     
     if (fileInput.files.length === 0) return alert("Select documents first.");
 
-    // 🛑 NEW: Stop them if they select more than 3 files
     if (fileInput.files.length > 3) {
         return alert("🚫 MAX LIMIT EXCEEDED: Please select a maximum of 3 documents (Rate Con, BOL, Invoice).");
     }
 
-    // --- STRICT FILE TYPE VALIDATION ---
     const allowedExtensions = ['.pdf', '.csv', '.txt'];
     for (let file of fileInput.files) {
         const ext = file.name.substring(file.name.lastIndexOf('.')).toLowerCase();
@@ -72,11 +99,15 @@ document.getElementById('auditForm').addEventListener('submit', async (e) => {
     const results = document.getElementById('results');
     const alertModal = document.getElementById('alertModal');
 
-    // RESET UI
+    // Reset UI
     btn.disabled = true;
     loadingBox.style.display = 'block';
     results.style.display = 'none';
-    alertModal.style.display = 'none';
+    if (alertModal) alertModal.style.display = 'none';
+    
+    const pdfBtn = document.getElementById('downloadPdfBtn');
+    if (pdfBtn) pdfBtn.style.display = 'none'; 
+    
     progressBar.style.width = '0%';
     statusText.innerText = "Initializing AI model...";
 
@@ -93,8 +124,26 @@ document.getElementById('auditForm').addEventListener('submit', async (e) => {
 
     try {
         const response = await fetch('/api/audit', { method: 'POST', body: formData });
+        
+        // Failsafe 403 Interception (In case the frontend token count is out of sync)
+        if (response.status === 403) {
+            clearInterval(progressInterval);
+            loadingBox.style.display = 'none';
+            availableTokens = 0; // Force sync
+            document.getElementById('tokenCount').innerText = "0";
+            document.getElementById('paywallModal').style.display = 'flex';
+            btn.disabled = false;
+            return; 
+        }
+
         const data = await response.json();
-        if (data.error) throw new Error(data.error);
+        if (!response.ok || data.error) throw new Error(data.error || "Server processing failed.");
+
+        // Sync Live Token Count
+        if (data.tokens_remaining !== undefined) {
+            availableTokens = data.tokens_remaining;
+            document.getElementById('tokenCount').innerText = availableTokens;
+        }
 
         progressBar.style.width = '100%';
         statusText.innerText = "Complete!";
@@ -109,10 +158,7 @@ document.getElementById('auditForm').addEventListener('submit', async (e) => {
         document.getElementById('reportNotes').innerText = detailedNotes;
         document.getElementById('reportNotes').style.color = data.audit_summary.match_status ? '#333' : 'red';
 
-        // ... (inside the try block)
         const v = data.extracted_values || {};
-        
-        // UPDATED: Now looks for bol.declared_value
         document.getElementById('dataTableBody').innerHTML = `
             <tr><td><strong>Rate Con</strong></td><td>$${v.rate_con?.total || '0'}</td><td>${v.rate_con?.weight || '-'} lbs</td></tr>
             <tr><td><strong>BOL</strong></td><td>${v.bol?.declared_value ? '$' + v.bol.declared_value : '-'}</td><td>${v.bol?.weight || '-'} lbs</td></tr>
@@ -121,8 +167,12 @@ document.getElementById('auditForm').addEventListener('submit', async (e) => {
 
         results.style.display = 'block';
 
+        if (data.pdf_download) {
+            currentPdfBase64 = data.pdf_download;
+            if (pdfBtn) pdfBtn.style.display = 'block';
+        }
+
         if (!data.audit_summary.match_status) {
-            // ... (keep your existing alert modal logic here)
             const alertList = document.getElementById('alertMessageList');
             alertList.innerHTML = ''; 
             const tldrArray = data.discrepancy_tldr || ["Discrepancy detected. See notes for details."];
@@ -131,18 +181,20 @@ document.getElementById('auditForm').addEventListener('submit', async (e) => {
                 li.innerText = bullet;
                 alertList.appendChild(li);
             });
-            alertModal.style.display = 'flex';
+            if (alertModal) alertModal.style.display = 'flex';
         }
 
     } catch (err) {
         console.error("❌ ERROR:", err);
-        // NEW: Trigger the Failsafe Modal instead of a generic alert
         let errorMsg = "The AI was unable to parse the documents.";
         if (err.name === 'AbortError') errorMsg = "Timeout: The files were too large or the AI took too long to respond (over 20s).";
         else if (err.message) errorMsg = err.message;
 
-        document.getElementById('errorMessageText').innerText = errorMsg;
-        document.getElementById('errorModal').style.display = 'flex';
+        const errorTextEl = document.getElementById('errorMessageText');
+        if (errorTextEl) errorTextEl.innerText = errorMsg;
+        
+        const errorModal = document.getElementById('errorModal');
+        if (errorModal) errorModal.style.display = 'flex';
         
     } finally {
         clearInterval(progressInterval);
@@ -150,3 +202,71 @@ document.getElementById('auditForm').addEventListener('submit', async (e) => {
         loadingBox.style.display = 'none';
     }
 });
+
+// --- PDF DOWNLOAD LOGIC ---
+const downloadPdfBtn = document.getElementById('downloadPdfBtn');
+if (downloadPdfBtn) {
+    downloadPdfBtn.addEventListener('click', () => {
+        if (!currentPdfBase64) return;
+        
+        const link = document.createElement('a');
+        link.href = `data:application/pdf;base64,${currentPdfBase64}`;
+        link.download = `Freight_Audit_Dispute_${Date.now()}.pdf`;
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+    });
+}
+
+// --- STRIPE CHECKOUT ---
+async function triggerCheckout() {
+    try {
+        const res = await fetch('/api/checkout', { method: 'POST' });
+        const data = await res.json();
+        if (data.url) window.location.href = data.url; 
+    } catch (err) {
+        alert("Failed to initiate checkout. Please check your connection.");
+    }
+}
+
+// --- WAITLIST LOGIC (With Anti-Spam) ---
+async function joinWaitlist() {
+    // 1. Check if this device already signed up
+    if (localStorage.getItem('freight_waitlist_joined') === 'true') {
+        return alert("You are already on the waitlist!");
+    }
+
+    const emailInput = document.getElementById('waitlistEmail');
+    const email = emailInput.value;
+    const btn = event.target; // Gets the button that was clicked
+
+    if (!email.includes('@')) return alert("Please enter a valid email address.");
+    
+    // 2. Disable the button instantly to prevent double-clicks
+    btn.disabled = true;
+    btn.innerText = "Joining...";
+    btn.style.background = "#555";
+    
+    try {
+        const res = await fetch('/api/waitlist', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ email })
+        });
+        
+        if (res.ok) {
+            // 3. Lock this device out from future signups
+            localStorage.setItem('freight_waitlist_joined', 'true');
+            document.getElementById('waitlistSuccess').style.display = 'block';
+            emailInput.style.display = 'none'; // Hide the input field
+            btn.style.display = 'none'; // Hide the button completely
+        } else {
+            throw new Error("Server rejected");
+        }
+    } catch (err) {
+        alert("Error joining the waitlist. Please try again.");
+        btn.disabled = false;
+        btn.innerText = "Join Waitlist";
+        btn.style.background = "#003366";
+    }
+}
