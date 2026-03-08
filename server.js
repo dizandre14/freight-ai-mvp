@@ -15,7 +15,7 @@ const port = 3000;
 
 // Security & Token Setup
 const JWT_SECRET = process.env.JWT_SECRET || 'super-secret-freight-key-change-this';
-const FREE_TOKENS = 4;
+const FREE_TOKENS = 0;
 const PAID_TOKENS = 10;
 
 const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
