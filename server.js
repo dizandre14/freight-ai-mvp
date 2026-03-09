@@ -111,7 +111,7 @@ app.post('/api/audit', apiLimiter, tokenManager, upload.array('documents', 3), a
             return res.status(400).json({ error: "Please upload between 1 and 3 freight documents." });
         }
 
-        const model = genAI.getGenerativeModel({ model: "gemini-3-flash" });
+        const model = genAI.getGenerativeModel({ model: "gemini-3-flash" }); // Forcing Render update for Gemini model
 
         const imageParts = req.files.map(file => {
             let mimeType = 'text/plain';
