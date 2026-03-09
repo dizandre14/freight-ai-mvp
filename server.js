@@ -82,6 +82,13 @@ function generateDisputePDF(auditData) {
         doc.fontSize(14).text('Dispute Details:', { underline: true });
         doc.fontSize(12).text(auditData.discrepancy_details);
         
+        // --- NEW: CONFIDENCE & SOURCE PROOF ---
+        doc.moveDown();
+        doc.fontSize(12).text(`Audit Confidence Level: ${auditData.audit_summary.confidence_level || 'N/A'}`);
+        doc.moveDown();
+        doc.fillColor('gray').text(`Source Quote: "${auditData.source_proof || 'N/A'}"`);
+        doc.fillColor('black'); // Reset back to black for the footer
+        
         // The Watermark / Security Footer
         doc.moveDown(4);
         doc.fontSize(10).fillColor('gray').text(`Audited by Freight AI - ${new Date().toLocaleDateString()}`, { align: 'center' });
@@ -133,16 +140,17 @@ app.post('/api/audit', apiLimiter, tokenManager, upload.array('documents', 3), a
 
         CRITICAL INSTRUCTION: You must respond with ONLY valid JSON. Do NOT include any conversational text.
 
-        Output JSON Schema:
+Output JSON Schema:
         {
-          "audit_summary": { "load_id": "string", "match_status": boolean, "discrepancy_found": boolean },
+          "audit_summary": { "load_id": "string", "match_status": boolean, "discrepancy_found": boolean, "confidence_level": "High or Low" },
           "extracted_values": {
             "rate_con": {"total": 0.00, "weight": 0, "accessorials": []},
             "bol": {"weight": 0, "is_signed": boolean, "declared_value": 0.00},
             "invoice": {"total": 0.00, "weight": 0, "fees_found": []}
           },
           "discrepancy_tldr": ["Short bullet point 1"],
-          "discrepancy_details": "Detailed paragraph explaining what is wrong for a dispute."
+          "discrepancy_details": "Detailed paragraph explaining what is wrong for a dispute.",
+          "source_proof": "Quote the exact text from the documents that conflict. If no conflict, write N/A."
         }
         `;
 
