@@ -109,7 +109,25 @@ document.getElementById('auditForm').addEventListener('submit', async (e) => {
     if (pdfBtn) pdfBtn.style.display = 'none'; 
     
     progressBar.style.width = '0%';
+
     statusText.innerText = "Initializing AI model...";
+    
+    // --- DYNAMIC TIMER LOGIC ---
+    let timeLeft = 8;
+    const timerDisplay = document.getElementById('timer-count');
+    
+    // Ensure the display resets to 8 every time
+    if (timerDisplay) timerDisplay.innerText = timeLeft;
+
+    const countdown = setInterval(() => {
+        timeLeft--;
+        if (timeLeft <= 0) {
+            if (timerDisplay) timerDisplay.innerText = "1"; // Hold at 1 so it doesn't hit 0/negative
+            clearInterval(countdown);
+        } else {
+            if (timerDisplay) timerDisplay.innerText = timeLeft;
+        }
+    }, 1000);
 
     const formData = new FormData();
     for (let file of fileInput.files) formData.append('documents', file);
@@ -197,6 +215,7 @@ document.getElementById('auditForm').addEventListener('submit', async (e) => {
         if (errorModal) errorModal.style.display = 'flex';
         
     } finally {
+        clearInterval(countdown); 
         clearInterval(progressInterval);
         btn.disabled = false;
         loadingBox.style.display = 'none';
