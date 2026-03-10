@@ -114,6 +114,30 @@
 
     <div id="results" style="display:none; margin-top:30px;">
         <div id="statusBox" style="padding:20px; border-radius:8px; text-align:center; font-weight:bold; margin-bottom:20px;"></div>
+        
+        <!-- NEW: Total Saved, Evidence Box, & Email Action UI -->
+        <div id="actionContainer" style="display:none; background:#f8f9fa; border:1px solid #ccc; padding:20px; border-radius:8px; margin-bottom:20px; text-align:center;">
+            <h2 style="margin-top:0; color:#003366;">Detected Profit Leak: <span id="totalSavedDisplay" style="color:#28a745;">$0.00</span></h2>
+            
+            <!-- THE NEW EVIDENCE BOX -->
+            <div style="background: white; border: 1px solid #eee; padding: 25px 20px; border-radius: 6px; margin: 15px 0; text-align: center; box-shadow: 0 2px 4px rgba(0,0,0,0.02);">
+                <p style="margin: 0 0 15px 0; font-size: 20px;">
+                    <strong>Audit Confidence Level:</strong> 
+                    <span id="uiConfidenceLevel" style="font-weight: bold;"></span>
+                    <span id="uiReviewWarning" style="font-size: 16px; font-style: italic; margin-left: 8px;"></span>
+                </p>
+                
+                <p style="margin: 0 0 10px 0; color: #333; font-size: 20px;"><strong>Document Reference:</strong></p>
+                
+                <ul id="uiSourceQuote" style="margin: 0 auto; display: inline-block; text-align: left; color: #555; font-size: 20px; font-style: italic; line-height: 1.6; padding-left: 20px; max-width: 95%;"></ul>
+            </div>
+
+            <button id="copyEmailBtn" style="padding:12px 20px; background:#003366; color:white; border:none; border-radius:6px; cursor:pointer; font-weight:bold; margin-top:5px; font-size: 14px;">
+                📋 Copy Dispute Email to Clipboard
+            </button>
+        </div>
+        <!-- END NEW UI -->
+
         <div class="table-container">
             <table>
                 <thead>

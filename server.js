@@ -82,12 +82,12 @@ function generateDisputePDF(auditData) {
         doc.fontSize(14).text('Dispute Details:', { underline: true });
         doc.fontSize(12).text(auditData.discrepancy_details);
         
-        // --- NEW: CONFIDENCE & SOURCE PROOF ---
-        doc.moveDown();
-        doc.fontSize(12).text(`Audit Confidence Level: ${auditData.audit_summary.confidence_level || 'N/A'}`);
-        doc.moveDown();
-        doc.fillColor('gray').text(`Source Quote: "${auditData.source_proof || 'N/A'}"`);
-        doc.fillColor('black'); // Reset back to black for the footer
+        // // --- NEW: CONFIDENCE & SOURCE PROOF ---
+        // doc.moveDown();
+        // doc.fontSize(12).text(`Audit Confidence Level: ${auditData.audit_summary.confidence_level || 'N/A'}`);
+        // doc.moveDown();
+        // doc.fillColor('gray').text(`Source Quote: "${auditData.source_proof || 'N/A'}"`);
+        // doc.fillColor('black'); // Reset back to black for the footer
         
         // The Watermark / Security Footer
         doc.moveDown(4);
@@ -118,7 +118,7 @@ app.post('/api/audit', apiLimiter, tokenManager, upload.array('documents', 3), a
             return res.status(400).json({ error: "Please upload between 1 and 3 freight documents." });
         }
 
-        const model = genAI.getGenerativeModel({ model: "gemini-2.5-flash" }); // Forcing Render update for Gemini model
+        // const model = genAI.getGenerativeModel({ model: "gemini-2.5-flash" });
 
         const imageParts = req.files.map(file => {
             let mimeType = 'text/plain';
@@ -154,8 +154,20 @@ Output JSON Schema:
         }
         `;
 
-        const result = await model.generateContent([prompt, ...imageParts]);
-        const responseText = result.response.text();
+let responseText = "";
+        try {
+            // Attempt 1: Try the primary, highly capable model
+            const primaryModel = genAI.getGenerativeModel({ model: "gemini-2.5-flash" });
+            const result = await primaryModel.generateContent([prompt, ...imageParts]);
+            responseText = result.response.text();
+        } catch (primaryError) {
+            console.warn("⚠️ Primary AI busy or failed. Engaging fallback...", primaryError.message);
+            
+            // Attempt 2: Immediately route to the lighter, faster model
+            const fallbackModel = genAI.getGenerativeModel({ model: "gemini-2.5-flash-lite" });
+            const fallbackResult = await fallbackModel.generateContent([prompt, ...imageParts]);
+            responseText = fallbackResult.response.text();
+        }
         
         const startIndex = responseText.indexOf('{');
         const endIndex = responseText.lastIndexOf('}');

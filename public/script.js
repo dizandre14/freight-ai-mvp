@@ -1,7 +1,8 @@
 // --- GLOBAL VARIABLES & SECURITY ---
 const SITE_PASSWORD = "audit"; 
 let currentPdfBase64 = null; 
-let availableTokens = null; // NEW: Tracks tokens locally to prevent order-of-execution bugs
+let availableTokens = null; 
+let currentAuditData = null;
 
 // --- INITIALIZATION (Runs on page load) ---
 window.onload = async () => {
@@ -177,6 +178,78 @@ document.getElementById('auditForm').addEventListener('submit', async (e) => {
         document.getElementById('reportNotes').style.color = data.audit_summary.match_status ? '#333' : 'red';
 
         const v = data.extracted_values || {};
+
+        currentAuditData = data; 
+        
+        const rateAmount = parseFloat(String(v.rate_con?.total || '0').replace(/[^0-9.]/g, ''));
+        const invAmount = parseFloat(String(v.invoice?.total || '0').replace(/[^0-9.]/g, ''));
+        const discrepancyAmount = Math.abs(rateAmount - invAmount).toFixed(2);
+        
+        const totalSavedEl = document.getElementById('totalSavedDisplay');
+        if (totalSavedEl) totalSavedEl.innerText = `$${discrepancyAmount}`;
+
+        const confidenceEl = document.getElementById('uiConfidenceLevel');
+        const warningEl = document.getElementById('uiReviewWarning');
+        
+        if (confidenceEl) {
+            const confLevel = data.audit_summary.confidence_level || "N/A";
+            confidenceEl.innerText = confLevel;
+            
+            // Clear warning by default
+            if (warningEl) warningEl.innerText = "";
+            
+            // --- NEW: Dynamic Color & Warning Logic ---
+            const levelLower = confLevel.toLowerCase();
+            if (levelLower.includes('high')) {
+                confidenceEl.style.color = '#28a745'; // Green
+                
+            } else if (levelLower.includes('medium') || levelLower.includes('potential')) {
+                confidenceEl.style.color = '#ff9900'; // Orange/Yellow
+                if (warningEl) {
+                    warningEl.innerText = "- Manual review might be needed";
+                    warningEl.style.color = '#ff9900';
+                }
+                
+            } else if (levelLower.includes('low')) {
+                confidenceEl.style.color = '#dc3545'; // Red
+                if (warningEl) {
+                    warningEl.innerText = "- Manual review will be needed";
+                    warningEl.style.color = '#dc3545';
+                }
+                
+            } else {
+                confidenceEl.style.color = '#003366'; // Default MVP Blue
+            }
+        }
+
+        const sourceQuoteEl = document.getElementById('uiSourceQuote');
+        if (sourceQuoteEl) {
+            const rawQuote = data.source_proof || "N/A";
+            sourceQuoteEl.innerHTML = ''; // Clear out any previous data
+            
+            if (rawQuote === "N/A") {
+                sourceQuoteEl.innerHTML = '<li style="margin-bottom: 6px;">"N/A"</li>';
+            } else {
+                // Split the AI response by newlines and filter out any blank spaces
+                const lines = rawQuote.split('\n').filter(line => line.trim() !== '');
+                
+                // Create a bullet point for each line
+                lines.forEach(line => {
+                    const li = document.createElement('li');
+                    // Clean up any weird extra quotes the AI might add, then wrap the bullet neatly
+                    let cleanLine = line.trim().replace(/^"|"$/g, '').replace(/^'|'$/g, '');
+                    li.innerText = `"${cleanLine}"`;
+                    li.style.marginBottom = "8px"; // Adds breathing room between bullets
+                    sourceQuoteEl.appendChild(li);
+                });
+            }
+        }
+        
+        const actionContainer = document.getElementById('actionContainer');
+        if (actionContainer) {
+            actionContainer.style.display = !data.audit_summary.match_status ? 'block' : 'none';
+        }
+
         document.getElementById('dataTableBody').innerHTML = `
             <tr><td><strong>Rate Con</strong></td><td>$${v.rate_con?.total || '0'}</td><td>${v.rate_con?.weight || '-'} lbs</td></tr>
             <tr><td><strong>BOL</strong></td><td>${v.bol?.declared_value ? '$' + v.bol.declared_value : '-'}</td><td>${v.bol?.weight || '-'} lbs</td></tr>
@@ -288,4 +361,51 @@ async function joinWaitlist() {
         btn.innerText = "Join Waitlist";
         btn.style.background = "#003366";
     }
+}
+
+// --- COPY EMAIL LOGIC ---
+const copyEmailBtn = document.getElementById('copyEmailBtn');
+if (copyEmailBtn) {
+    copyEmailBtn.addEventListener('click', () => {
+        if (!currentAuditData) return;
+
+        const loadId = currentAuditData.audit_summary.load_id || "UNKNOWN";
+        const discrepancyText = currentAuditData.discrepancy_details || "A financial mismatch was detected between the Rate Confirmation and the Final Invoice.";
+        const totalAmount = document.getElementById('totalSavedDisplay').innerText;
+        
+        // --- NEW: Grab the source quote and confidence level ---
+        const sourceQuote = currentAuditData.source_proof && currentAuditData.source_proof !== "N/A" 
+            ? `\nDocument Reference:\n"${currentAuditData.source_proof}"` 
+            : "";
+            
+        const confidenceLevel = currentAuditData.audit_summary.confidence_level || "High";
+
+        const emailBody = `Subject: Action Required: Billing Discrepancy for Load #${loadId}
+
+Hello,
+
+Our AI-assisted audit system has flagged a ${confidenceLevel} confidence discrepancy of ${totalAmount} regarding Load #${loadId}.
+
+Discrepancy Details:
+- ${discrepancyText}
+${sourceQuote}
+
+I have attached a Verified Audit Report (PDF) which includes the document timestamps for these items.
+
+Please review the attached evidence and provide an updated Rate Con or confirmation of payment for the corrected amount.
+
+Thank you,`;
+
+        navigator.clipboard.writeText(emailBody).then(() => {
+            const originalText = copyEmailBtn.innerText;
+            copyEmailBtn.innerText = "✅ Copied to Clipboard!";
+            copyEmailBtn.style.background = "#28a745";
+            setTimeout(() => {
+                copyEmailBtn.innerText = originalText;
+                copyEmailBtn.style.background = "#003366";
+            }, 3000);
+        }).catch(err => {
+            alert("Failed to copy text. Please try manually.");
+        });
+    });
 }
